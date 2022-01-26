@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 from PIL import Image
 
-#  resize, grayscale, and gaussian blur
+# resize, grayscale, and gaussian blur
 def preprocess_image(image_path, rescale):
 	image = cv2.imread(image_path)
 	image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -14,7 +14,7 @@ def preprocess_image(image_path, rescale):
 	image = cv2.GaussianBlur(image, (5, 5), cv2.BORDER_DEFAULT)
 	return image
 
-#  user interacted seed selection through mouse click
+# user interacted seed selection through mouse click
 def left_click(event, x, y, flags, param):
 	global seeds
 	if event == cv2.EVENT_LBUTTONDOWN:
@@ -29,11 +29,11 @@ def pick_seeds(image):
 	cv2.waitKey(0)
 	cv2.destroyAllWindows()
 
-#  ensure region growing remains within image
+# ensure region growing remains within image
 def pixel_within_image(pixel_coord, image_shape):
 	return (0 <= pixel_coord[0] < image_shape[0]) and (0 <= pixel_coord[1] < image_shape[1])
 
-#  return neighboring pixel's coordinate
+# return neighboring pixel's coordinate
 def get_neighbor_coord(pixel_coord, orientation, image_shape):
     neighbor_coord = (pixel_coord[0] + orientation[0], pixel_coord[1] + orientation[1])
     if pixel_within_image(neighbor_coord, image_shape): # check that neighbor is within image
@@ -41,7 +41,7 @@ def get_neighbor_coord(pixel_coord, orientation, image_shape):
     else:
         return None
 
-#  return neighboring pixel's intensity
+# return neighboring pixel's intensity
 def get_neighbor_intensity(image, pixel_coord, orientation, image_shape):
 	neighbor_coord = (pixel_coord[0] + orientation[0], pixel_coord[1] + orientation[1])
 	if pixel_within_image(neighbor_coord, image_shape):
@@ -50,13 +50,12 @@ def get_neighbor_intensity(image, pixel_coord, orientation, image_shape):
 	else:
 		return None
 
-#  determine mean and std of 3 x 3 neighborhood around the seed
+# compute mean and std of 3 x 3 neighborhood around the seed
 def neighborhood_mean_std(image, pixel_coord, orientations):
 	neighborhood = []
 	neighborhood.append(image[pixel_coord[0], pixel_coord[1]]) # add center pixel
 	for orientation in orientations: # add 8-conn neighbors
-		neighbor_intensity = get_neighbor_intensity(image, pixel_coord, orientation,
-							    image.shape)
+		neighbor_intensity = get_neighbor_intensity(image, pixel_coord, orientation, image.shape)
 		if neighbor_intensity is None:
 			continue
 		neighborhood.append(neighbor_intensity)
@@ -64,7 +63,7 @@ def neighborhood_mean_std(image, pixel_coord, orientations):
 	neighborhood_std = np.std(neighborhood)
 	return neighborhood_mean, neighborhood_std
 
-#  recruit unexamined pixels to active front
+# recruit unexamined pixels to active front
 def recruit_neighbors(image, pixel_coord, active_front, segmented_region, orientations):
 	for orientation in orientations:
 		neighbor = get_neighbor_coord(pixel_coord, orientation, image.shape)
@@ -75,8 +74,8 @@ def recruit_neighbors(image, pixel_coord, active_front, segmented_region, orient
 			segmented_region[neighbor[0], neighbor[1]] = 150 # color active front
 	return active_front
 
-#  randomly grant any active front pixel region membership
-#  region growing terminating condition maintained by thresholds
+# randomly grant any active front pixel region membership
+# region growing terminating condition maintained by thresholds
 def random_walk(image, active_front, running_mean):
 	af_dist = [abs(image[af_pixel[0], af_pixel[1]] - running_mean)
                	   for af_pixel in active_front]
@@ -87,9 +86,9 @@ def random_walk(image, active_front, running_mean):
 	random_af = random.choice(list(enumerate(af_dist)))[0]
 	return random_af, smallest_distance, largest_distance
 
-#  determine the most similar and dissimilar active front pixels by intensity val
-#  in other words, ensure least perturbance to segmented region mean
-#  and detect region externality, ie newly encountered pixels are too different
+# determine the most similar and dissimilar active front pixels by intensity val
+# in other words, ensure least perturbance to segmented region mean
+# and detect region externality, ie newly encountered pixels are too different
 def distance(image, active_front, running_mean):
 	af_dist = [abs(image[af_pixel[0], af_pixel[1]] - running_mean)
               	   for af_pixel in active_front]
@@ -100,7 +99,7 @@ def distance(image, active_front, running_mean):
 	closest_af = np.argmin(af_dist)
 	return closest_af, smallest_distance, largest_distance
 
-#  update homogeneity parameters as region grows
+# update homogeneity parameters as region grows
 def adaptive_growing(new_x, running_mean, std, region_size, weight):
 	prev_mu = running_mean
 	new_mu = (prev_mu * (region_size - 1) + new_x) / region_size
@@ -112,7 +111,7 @@ def adaptive_growing(new_x, running_mean, std, region_size, weight):
 	lower_threshold = new_mu - (new_std * weight + c)
 	return new_mu, new_std, upper_threshold, lower_threshold
 
-#  non-adaptive seeded region growing
+# non-adaptive seeded region growing
 def nonadaptive_region_growing(seeds, image):
 	print("Performing Non-Adaptive Region Growing: ")
 	global nonadaptive_grown_region
@@ -142,7 +141,7 @@ def nonadaptive_region_growing(seeds, image):
 			del active_front[closest_af]  # remove segmented pixel from active front
 		print("Non-adaptive mean for seed ({}, {}): {}".format(seed[1], seed[0], mean))
 
-#  exploratory seeded region growing for learning homogeneity est
+# exploratory seeded region growing for learning homogeneity est
 def first_region_growing(seeds, image):
 	print("Performing First Adaptive Region Growing: ")
 	global explored_grown_region
@@ -165,12 +164,10 @@ def first_region_growing(seeds, image):
 		active_front = []
 
 		while (smallest_distance > lower_threshold and largest_distance < upper_threshold):
-			explored_grown_region[pixel_coord[0], pixel_coord[1]] = 255 # segment current pixel
+			explored_grown_region[pixel_coord[0], pixel_coord[1]] = 255  # segment current pixel
 			active_front = recruit_neighbors(image, pixel_coord, active_front,
                                             		 explored_grown_region, orientations)
-			random_af, smallest_distance, largest_distance = random_walk(image,
-                                                                        	     active_front,
-                                                                         	     running_mean)
+			random_af, smallest_distance, largest_distance = random_walk(image, active_front, running_mean)
 			if random_af == -1:
 				break  # move onto next seed
 			pixel_coord = active_front[random_af]  # reassign boundary representative
@@ -187,9 +184,9 @@ def first_region_growing(seeds, image):
                                                                          	   running_mean, std))
 	return running_mean, std, region_size
 
-#  second region growing reuses same seed(s) and is parameterized using
-#  first grown region's supplied homogeneity estimate
-#  weight increased to 2.58 to encompass 99% of region if noise is gaussian
+# second region growing reuses same seed(s) and is parameterized using
+# first grown region's supplied homogeneity estimate
+# weight increased to 2.58 to encompass 99% of region if noise is gaussian
 def second_region_growing(seeds, image, learned_mean, learned_std, region_size):
 	print("Performing Second Adaptive Region Growing: ")
 	global final_grown_region
@@ -231,7 +228,7 @@ def second_region_growing(seeds, image, learned_mean, learned_std, region_size):
 		print("Fine-tuned adaptive mean and std for seed ({}, {}): {}, {}".format(seed[1], seed[0],
                                                                                   	  running_mean, std))
 
-#  overlay segmentation onto image and save
+# overlay segmentation onto image and save
 def grown_region_result(original_image, segmented_region, save_name):
 	overlay_segmentation = np.maximum(original_image, segmented_region)
 	overlay_segmentation = np.asarray(overlay_segmentation, dtype = np.uint8)
@@ -242,9 +239,9 @@ def grown_region_result(original_image, segmented_region, save_name):
 	cv2.waitKey(0)
 	cv2.destroyAllWindows()
 
-#  say "hi," marie
+# say "hi," marie
 if __name__ == '__main__':
-	image_path = '/Users/julie/Desktop/marie.jpg'
+	image_path = '/follow/your/own/path.jpg'
 	rescale = 25
 	image = preprocess_image(image_path, rescale)
 
@@ -252,16 +249,16 @@ if __name__ == '__main__':
 	explored_grown_region = np.zeros(image.shape)
 	final_grown_region = np.zeros(image.shape)
 	seeds = []
-    # 8-connected directions
+    	# 8-connected pixels
 	orientations = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
 	pick_seeds(image)
 	original_image = image  # preserve unnormalized image
 	image = image.astype('float32') / 255.0  # normalize [0, 1]
 
-	save_name1 = "nonadapted_rg.png"
-	save_name2 = "adapted_rg1.png"
-	save_name3 = "adapted_rg2.png"
+	save_name1 = "nonadapt_rg.png"
+	save_name2 = "adapt_rg1.png"
+	save_name3 = "adapt_rg2.png"
 
 	nonadaptive_region_growing(seeds, image)
 	grown_region_result(original_image, nonadaptive_grown_region, save_name1)
